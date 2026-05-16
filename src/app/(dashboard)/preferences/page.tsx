@@ -66,6 +66,7 @@ export default function PreferencesPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [storeSearch, setStoreSearch] = useState('')
 
   const supabase = createClient()
@@ -100,19 +101,24 @@ export default function PreferencesPage() {
     e.preventDefault()
     setSaving(true)
     setSaved(false)
+    setSaveError(null)
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    await supabase.from('preferences').upsert({
+    const { error } = await supabase.from('preferences').upsert({
       ...prefs,
       user_id: user.id,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id' })
 
     setSaving(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
+    if (error) {
+      setSaveError(error.message)
+    } else {
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    }
   }
 
   function toggleStore(name: string, supportsOnlineOrdering: boolean) {
@@ -349,6 +355,7 @@ export default function PreferencesPage() {
           {saving ? 'Saving...' : 'Save preferences'}
         </button>
         {saved && <span className="text-emerald-600 text-sm font-medium">Saved!</span>}
+        {saveError && <span className="text-red-600 text-sm">{saveError}</span>}
       </div>
     </form>
   )
