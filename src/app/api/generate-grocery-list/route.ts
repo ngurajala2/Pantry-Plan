@@ -65,12 +65,23 @@ Use realistic average US grocery prices. Exclude items already in the pantry. Gr
   const text = response.content[0].type === 'text' ? response.content[0].text : '[]'
 
   try {
-    const jsonMatch = text.match(/\[[\s\S]*\]/)
-    if (!jsonMatch) throw new Error('No JSON array found')
-    const groceryList = JSON.parse(jsonMatch[0])
+    // Strip markdown code fences if Claude wrapped the JSON
+    const cleaned = text.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim()
+
+    let groceryList
+    try {
+      groceryList = JSON.parse(cleaned)
+    } catch {
+      // Fall back to extracting the first [...] block
+      const jsonMatch = cleaned.match(/\[[\s\S]*\]/)
+      if (!jsonMatch) throw new Error('No JSON array found in response')
+      groceryList = JSON.parse(jsonMatch[0])
+    }
+
+    if (!Array.isArray(groceryList)) throw new Error('Response was not an array')
+
     const totalCost = groceryList.reduce((sum: number, item: { estimatedCost?: number }) => sum + (item.estimatedCost ?? 0), 0)
 
-    // Save to weekly plan
     if (weekPlanId) {
       await supabase
         .from('weekly_plans')
@@ -79,7 +90,8 @@ Use realistic average US grocery prices. Exclude items already in the pantry. Gr
     }
 
     return NextResponse.json({ groceryList, totalCost: Math.round(totalCost * 100) / 100 })
-  } catch {
+  } catch (err) {
+    console.error('Grocery list parse error:', err, '\nRaw response:', text)
     return NextResponse.json({ error: 'Could not generate grocery list' }, { status: 500 })
   }
 }
