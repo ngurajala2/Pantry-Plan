@@ -37,6 +37,7 @@ export async function POST(request: NextRequest) {
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 2048,
+    system: 'You are a grocery list generator. Output ONLY a valid JSON array with no markdown, no explanation, and no text outside the array.',
     messages: [
       {
         role: 'user',
@@ -51,33 +52,27 @@ ${pantryList || 'Nothing in pantry'}
 PREFERRED STORES: ${stores || 'Any'}
 ${budget ? `WEEKLY BUDGET: $${budget}` : ''}
 
-Return ONLY a valid JSON array like this:
+Return a JSON array like this:
 [
   { "item": "chicken breast", "quantity": "2 lbs", "estimatedCost": 8.99, "category": "Meat & Fish" },
   { "item": "spinach", "quantity": "1 bag", "estimatedCost": 3.49, "category": "Produce" }
 ]
 
-Use realistic average US grocery prices. Exclude items already in the pantry. Group similar items together.`,
+Use realistic average US grocery prices. Exclude items already in the pantry.`,
+      },
+      {
+        role: 'assistant',
+        content: '[',
       },
     ],
   })
 
-  const text = response.content[0].type === 'text' ? response.content[0].text : '[]'
+  // We prefilled with '[', so prepend it to reconstruct the full array
+  const raw = response.content[0].type === 'text' ? response.content[0].text : ']'
+  const text = '[' + raw
 
   try {
-    // Strip markdown code fences if Claude wrapped the JSON
-    const cleaned = text.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim()
-
-    let groceryList
-    try {
-      groceryList = JSON.parse(cleaned)
-    } catch {
-      // Fall back to extracting the first [...] block
-      const jsonMatch = cleaned.match(/\[[\s\S]*\]/)
-      if (!jsonMatch) throw new Error('No JSON array found in response')
-      groceryList = JSON.parse(jsonMatch[0])
-    }
-
+    const groceryList = JSON.parse(text)
     if (!Array.isArray(groceryList)) throw new Error('Response was not an array')
 
     const totalCost = groceryList.reduce((sum: number, item: { estimatedCost?: number }) => sum + (item.estimatedCost ?? 0), 0)
