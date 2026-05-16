@@ -35,8 +35,8 @@ export async function POST(request: NextRequest) {
   const mealText = meals.map((m: Record<string, unknown>) => `${m.day}: ${m.breakfast} | ${m.lunch} | ${m.dinner}`).join('\n')
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 2048,
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 1024,
     system: 'You are a grocery list generator. Output ONLY a valid JSON array with no markdown, no explanation, and no text outside the array.',
     messages: [
       {
