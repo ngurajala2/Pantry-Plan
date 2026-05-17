@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
   try {
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
+      max_tokens: 4096,
       system: 'You are a grocery list generator. You must respond with ONLY a raw JSON array. No markdown. No backticks. No explanation. Start your response with [ and end with ].',
       messages: [
         {
